@@ -3,7 +3,7 @@
 
 # 数据配置
 data:
-  data_root: "../作业2 李沐房价预测/california-house-prices"  # 数据根目录
+  data_root: "../california-house-prices"  # 数据根目录
   train_file: "train.csv"
   test_file: "test.csv"
   target_column: "Sold Price"  # 目标变量

@@ -1,5 +1,6 @@
 """
 tensor是PyTorch里对多维数组,多维列表的表示.
+torch.rand(2, 20) 2*20的随机tensor 2指的是批次大小 20是维度 
 Tensor可以说是PyTorch里最重要的概念,PyTorch把对数据的存储和操作都封装在Tensor里。
 PyTorch里的模型训练的输入输出数据,模型的参数,都是用Tensor来表示的。
 Tensor在操作方面和NumPy的ndarray是非常类似的。不同的是Tensor还实现了像GPU计算加速自动求导等PyTorch的核心功能。
@@ -53,7 +54,9 @@ shape = (2,3)
 # shape1 = (2,3,4)
 rand_tensor = torch.rand(shape)
 # rand_tensor1 = torch.rand(shape1)
-# print(rand_tensor)
+print(rand_tensor)
+x = torch.rand(2, 20)
+print(x)
 # print(rand_tensor1.shape)
 # tensor([[0.6991, 0.8872, 0.0367],
 #         [0.9351, 0.8367, 0.4005]]) 从[0,1]均匀抽样

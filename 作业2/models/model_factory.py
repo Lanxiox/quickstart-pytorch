@@ -1,11 +1,61 @@
 """
 模型定义模块
-定义各种神经网络模型
+定义各种神经网络模型，包括分类和回归模型
 """
 
 import torch
 import torch.nn as nn
-from typing import Dict, Any
+from typing import Dict, Any, List
+
+
+class HousePriceMLP(nn.Module):
+    """
+    房价预测MLP模型
+    用于回归任务
+    """
+
+    def __init__(
+        self,
+        input_dim: int,
+        hidden_sizes: List[int] = [256, 128, 64, 32],
+        dropout: float = 0.3
+    ):
+        """
+        初始化模型
+
+        Args:
+            input_dim: 输入特征维度
+            hidden_sizes: 隐藏层大小列表
+            dropout: Dropout比例
+        """
+        super(HousePriceMLP, self).__init__()
+
+        layers = []
+        prev_size = input_dim
+
+        for hidden_size in hidden_sizes:
+            layers.append(nn.Linear(prev_size, hidden_size))
+            layers.append(nn.BatchNorm1d(hidden_size))
+            layers.append(nn.ReLU())
+            layers.append(nn.Dropout(dropout))
+            prev_size = hidden_size
+
+        # 输出层 - 回归任务，输出1个值
+        layers.append(nn.Linear(prev_size, 1))
+
+        self.network = nn.Sequential(*layers)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        前向传播
+
+        Args:
+            x: 输入张量
+
+        Returns:
+            预测值
+        """
+        return self.network(x)
 
 
 class LNnet(nn.Module):
@@ -86,7 +136,7 @@ class SimpleCNN(nn.Module):
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
 
         # 全连接层
-        self.fc1 = nn.Linear(128 * 3 * 3, 256)  # 经过两次池化: 28->14->7,第三次卷积后是7
+        self.fc1 = nn.Linear(128 * 3 * 3, 256)
         self.fc2 = nn.Linear(256, num_classes)
 
         # Dropout
@@ -139,7 +189,16 @@ def create_model(model_config: Dict[str, Any]) -> nn.Module:
         model = LNnet(**params)
     elif model_name == 'SimpleCNN':
         model = SimpleCNN(**params)
+    elif model_name == 'HousePriceMLP':
+        model = HousePriceMLP(**params)
     else:
         raise ValueError(f"Unknown model name: {model_name}")
+
+    # 打印模型信息
+    total_params = sum(p.numel() for p in model.parameters())
+    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print(f"模型: {model_name}")
+    print(f"  - 总参数量: {total_params:,}")
+    print(f"  - 可训练参数量: {trainable_params:,}")
 
     return model

@@ -1,0 +1,10 @@
+2026-03-18 21:27:08 - DeepLearningPipeline - INFO - 日志文件: ./outputs_house_price/logs/train_20260318_212708.log
+2026-03-18 21:27:08 - DeepLearningPipeline - INFO - ============================================================
+2026-03-18 21:27:08 - DeepLearningPipeline - INFO - 实验名称: california_house_price_prediction
+2026-03-18 21:27:08 - DeepLearningPipeline - INFO - 实验描述: California房价预测 - Kaggle比赛数据
+2026-03-18 21:27:08 - DeepLearningPipeline - INFO - 随机种子: 42
+2026-03-18 21:27:08 - DeepLearningPipeline - INFO - ============================================================
+2026-03-18 21:27:08 - DeepLearningPipeline - INFO - 创建数据加载器...
+2026-03-18 21:27:09 - DeepLearningPipeline - INFO - 特征维度: 22
+2026-03-18 21:27:09 - DeepLearningPipeline - INFO - 创建模型...
+2026-03-18 21:27:09 - DeepLearningPipeline - INFO - 初始化训练器...

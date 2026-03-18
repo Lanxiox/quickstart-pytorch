@@ -14,14 +14,8 @@ class MetricsTracker:
     def __init__(self):
         """初始化指标追踪器"""
         self.history = {
-            'train': {
-                'loss': [],
-                'accuracy': []
-            },
-            'val': {
-                'loss': [],
-                'accuracy': []
-            }
+            'train': {},
+            'val': {}
         }
 
     def update(self, split: str, metrics: Dict[str, float], epoch: int) -> None:
@@ -60,53 +54,64 @@ class MetricsTracker:
         """
         os.makedirs(save_dir, exist_ok=True)
 
-        # 绘制损失曲线
-        if 'train' in self.history and 'loss' in self.history['train']:
-            self._plot_metric('loss', save_dir, 'Loss over Epochs')
+        # 获取所有指标
+        all_metrics = set()
+        for split in self.history:
+            for metric in self.history[split]:
+                all_metrics.add(metric)
 
-        # 绘制准确率曲线
-        if 'train' in self.history and 'accuracy' in self.history['train']:
-            self._plot_metric('accuracy', save_dir, 'Accuracy over Epochs')
+        # 绘制每个指标
+        for metric_name in all_metrics:
+            self._plot_metric(metric_name, save_dir)
 
         # 保存指标到JSON文件
         self._save_json(save_dir)
 
-    def _plot_metric(self, metric_name: str, save_dir: str, title: str) -> None:
+    def _plot_metric(self, metric_name: str, save_dir: str) -> None:
         """
         绘制指标曲线
 
         Args:
             metric_name: 指标名称
             save_dir: 保存目录
-            title: 图表标题
         """
-        plt.figure(figsize=(12, 5))
+        plt.figure(figsize=(10, 6))
+
+        has_data = False
 
         # 训练集
         if 'train' in self.history and metric_name in self.history['train']:
             plt.plot(
                 self.history['train'][metric_name],
-                label=f'Train {metric_name.capitalize()}',
-                marker='o'
+                label=f'Train {metric_name.upper()}',
+                marker='o',
+                markersize=4
             )
+            has_data = True
 
         # 验证集
         if 'val' in self.history and metric_name in self.history['val']:
             plt.plot(
                 self.history['val'][metric_name],
-                label=f'Val {metric_name.capitalize()}',
-                marker='s'
+                label=f'Val {metric_name.upper()}',
+                marker='s',
+                markersize=4
             )
+            has_data = True
+
+        if not has_data:
+            plt.close()
+            return
 
         plt.xlabel('Epoch')
-        plt.ylabel(metric_name.capitalize())
-        plt.title(title)
+        plt.ylabel(metric_name.upper())
+        plt.title(f'{metric_name.upper()} over Epochs')
         plt.legend()
-        plt.grid(True)
+        plt.grid(True, alpha=0.3)
 
         save_path = os.path.join(save_dir, f'{metric_name}_curve.png')
         plt.tight_layout()
-        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        plt.savefig(save_path, dpi=150, bbox_inches='tight')
         plt.close()
 
         print(f"图表已保存: {save_path}")
@@ -118,8 +123,23 @@ class MetricsTracker:
         Args:
             save_dir: 保存目录
         """
+        import json
+
+        # 转换numpy类型为Python原生类型
+        def convert_to_serializable(obj):
+            if isinstance(obj, dict):
+                return {k: convert_to_serializable(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [convert_to_serializable(item) for item in obj]
+            elif hasattr(obj, 'item'):  # numpy类型
+                return obj.item()
+            else:
+                return obj
+
+        history_serializable = convert_to_serializable(self.history)
+
         save_path = os.path.join(save_dir, 'metrics.json')
         with open(save_path, 'w', encoding='utf-8') as f:
-            json.dump(self.history, f, indent=4)
+            json.dump(history_serializable, f, indent=4)
 
         print(f"指标已保存: {save_path}")

@@ -1,25 +1,27 @@
 """
 训练模块
-负责模型的训练过程
+负责模型的训练过程 - 适配回归任务
 """
+
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from typing import Dict, Any, Callable, Optional
-import os
 from tqdm import tqdm
-import time
-from datetime import datetime
+import numpy as np
 
-from ..utils.logger import Logger
-from ..utils.metrics import MetricsTracker
-from ..utils.checkpoint import CheckpointManager
+from utils.logger import Logger
+from utils.metrics import MetricsTracker
+from utils.checkpoint import CheckpointManager
 
 
 class Trainer:
-    """训练器类"""
+    """训练器类 - 适配回归任务"""
 
     def __init__(
         self,
@@ -27,7 +29,8 @@ class Trainer:
         train_loader: DataLoader,
         val_loader: DataLoader,
         config: Dict[str, Any],
-        logger: Logger
+        logger: Logger,
+        feature_processor=None
     ):
         """
         初始化训练器
@@ -38,12 +41,14 @@ class Trainer:
             val_loader: 验证数据加载器
             config: 配置字典
             logger: 日志记录器
+            feature_processor: 特征处理器（用于目标变量逆变换）
         """
         self.model = model
         self.train_loader = train_loader
         self.val_loader = val_loader
         self.config = config
         self.logger = logger
+        self.feature_processor = feature_processor
 
         # 获取设备
         self.device = self._get_device()
@@ -52,6 +57,7 @@ class Trainer:
         # 训练配置
         self.training_config = config.get('training', {})
         self.output_config = config.get('output', {})
+        self.validation_config = config.get('validation', {})
 
         # 创建输出目录
         self._create_output_dirs()
@@ -65,18 +71,25 @@ class Trainer:
         # 初始化学习率调度器
         self.scheduler = self._create_scheduler()
 
+        # 早停
+        self.early_stopping_config = self.training_config.get('early_stopping', {})
+        self.early_stopping_patience = self.early_stopping_config.get('patience', 10)
+        self.early_stopping_min_delta = self.early_stopping_config.get('min_delta', 0.001)
+        self.early_stopping_counter = 0
+        self.best_val_loss = float('inf')
+
         # 指标追踪器
         self.metrics_tracker = MetricsTracker()
 
         # 检查点管理器
         self.checkpoint_manager = CheckpointManager(
-            save_dir=self.output_config.get('checkpoint_dir', './outputs/checkpoints'),
+            save_dir=self.output_config.get('checkpoint_dir', './outputs_house_price/checkpoints'),
             logger=logger
         )
 
         # 训练状态
         self.current_epoch = 0
-        self.best_metric = 0.0
+        self.best_metric = float('inf')
 
         self.logger.info(f"训练器初始化完成, 使用设备: {self.device}")
 
@@ -100,20 +113,28 @@ class Trainer:
     def _create_output_dirs(self) -> None:
         """创建输出目录"""
         dirs = [
-            self.output_config.get('save_dir', './outputs'),
-            self.output_config.get('checkpoint_dir', './outputs/checkpoints'),
-            self.output_config.get('log_dir', './outputs/logs'),
-            self.output_config.get('vis_dir', './outputs/visualizations')
+            self.output_config.get('save_dir', './outputs_house_price'),
+            self.output_config.get('checkpoint_dir', './outputs_house_price/checkpoints'),
+            self.output_config.get('log_dir', './outputs_house_price/logs'),
+            self.output_config.get('vis_dir', './outputs_house_price/visualizations')
         ]
 
         for dir_path in dirs:
             os.makedirs(dir_path, exist_ok=True)
 
     def _create_loss_function(self) -> nn.Module:
-        """创建损失函数"""
-        loss_name = self.training_config.get('loss_function', 'CrossEntropyLoss')
+        """创建损失函数 - 支持回归任务"""
+        loss_name = self.training_config.get('loss_function', 'MSELoss')
 
-        if hasattr(nn, loss_name):
+        if loss_name == 'MSELoss':
+            criterion = nn.MSELoss()
+        elif loss_name == 'MAELoss':
+            criterion = nn.L1Loss()
+        elif loss_name == 'SmoothL1Loss':
+            criterion = nn.SmoothL1Loss()
+        elif loss_name == 'HuberLoss':
+            criterion = nn.HuberLoss()
+        elif hasattr(nn, loss_name):
             criterion = getattr(nn, loss_name)()
         else:
             raise ValueError(f"Unknown loss function: {loss_name}")
@@ -162,6 +183,8 @@ class Trainer:
         params = scheduler_config.get('params', {})
 
         if scheduler_name == 'ReduceLROnPlateau':
+            # 移除不兼容的参数
+            params = {k: v for k, v in params.items() if k != 'verbose'}
             scheduler = optim.lr_scheduler.ReduceLROnPlateau(
                 self.optimizer,
                 **params
@@ -181,6 +204,42 @@ class Trainer:
 
         return scheduler
 
+    def _calculate_metrics(self, predictions: torch.Tensor, targets: torch.Tensor) -> Dict[str, float]:
+        """
+        计算回归指标
+
+        Args:
+            predictions: 预测值
+            targets: 真实值
+
+        Returns:
+            指标字典
+        """
+        # 转换为numpy
+        pred = predictions.cpu().numpy().flatten()
+        true = targets.cpu().numpy().flatten()
+
+        # MSE
+        mse = np.mean((pred - true) ** 2)
+
+        # RMSE
+        rmse = np.sqrt(mse)
+
+        # MAE
+        mae = np.mean(np.abs(pred - true))
+
+        # R² Score
+        ss_res = np.sum((true - pred) ** 2)
+        ss_tot = np.sum((true - np.mean(true)) ** 2)
+        r2 = 1 - (ss_res / ss_tot) if ss_tot > 0 else 0
+
+        return {
+            'mse': mse,
+            'rmse': rmse,
+            'mae': mae,
+            'r2': r2
+        }
+
     def train_epoch(self) -> Dict[str, float]:
         """
         训练一个epoch
@@ -190,8 +249,8 @@ class Trainer:
         """
         self.model.train()
         total_loss = 0.0
-        correct = 0
-        total = 0
+        all_predictions = []
+        all_targets = []
 
         progress_bar = tqdm(self.train_loader, desc=f"Epoch {self.current_epoch + 1} - Training")
 
@@ -216,20 +275,21 @@ class Trainer:
 
             # 统计
             total_loss += loss.item()
-            _, predicted = outputs.max(1)
-            total += targets.size(0)
-            correct += predicted.eq(targets).sum().item()
+            all_predictions.append(outputs.detach())
+            all_targets.append(targets.detach())
 
             # 更新进度条
             progress_bar.set_postfix({
-                'loss': f'{loss.item():.4f}',
-                'acc': f'{100. * correct / total:.2f}%'
+                'loss': f'{loss.item():.4f}'
             })
 
-        metrics = {
-            'loss': total_loss / len(self.train_loader),
-            'accuracy': correct / total
-        }
+        # 合并所有batch的预测和目标
+        all_predictions = torch.cat(all_predictions, dim=0)
+        all_targets = torch.cat(all_targets, dim=0)
+
+        # 计算指标
+        metrics = self._calculate_metrics(all_predictions, all_targets)
+        metrics['loss'] = total_loss / len(self.train_loader)
 
         return metrics
 
@@ -242,8 +302,8 @@ class Trainer:
         """
         self.model.eval()
         total_loss = 0.0
-        correct = 0
-        total = 0
+        all_predictions = []
+        all_targets = []
 
         with torch.no_grad():
             progress_bar = tqdm(self.val_loader, desc=f"Epoch {self.current_epoch + 1} - Validation")
@@ -255,19 +315,20 @@ class Trainer:
                 loss = self.criterion(outputs, targets)
 
                 total_loss += loss.item()
-                _, predicted = outputs.max(1)
-                total += targets.size(0)
-                correct += predicted.eq(targets).sum().item()
+                all_predictions.append(outputs)
+                all_targets.append(targets)
 
                 progress_bar.set_postfix({
-                    'loss': f'{loss.item():.4f}',
-                    'acc': f'{100. * correct / total:.2f}%'
+                    'loss': f'{loss.item():.4f}'
                 })
 
-        metrics = {
-            'loss': total_loss / len(self.val_loader),
-            'accuracy': correct / total
-        }
+        # 合并所有batch的预测和目标
+        all_predictions = torch.cat(all_predictions, dim=0)
+        all_targets = torch.cat(all_targets, dim=0)
+
+        # 计算指标
+        metrics = self._calculate_metrics(all_predictions, all_targets)
+        metrics['loss'] = total_loss / len(self.val_loader)
 
         return metrics
 
@@ -275,6 +336,8 @@ class Trainer:
         """训练模型"""
         epochs = self.training_config.get('epochs', 10)
         validation_config = self.config.get('validation', {})
+        metric_name = validation_config.get('metric', 'rmse')
+        mode = validation_config.get('mode', 'min')
 
         self.logger.info(f"开始训练, 共 {epochs} 个 epoch")
 
@@ -284,15 +347,21 @@ class Trainer:
             # 训练
             train_metrics = self.train_epoch()
             self.logger.info(
-                f"Epoch {epoch + 1}/{epochs} - Train - Loss: {train_metrics['loss']:.4f}, "
-                f"Accuracy: {train_metrics['accuracy']:.2%}"
+                f"Epoch {epoch + 1}/{epochs} - Train - "
+                f"Loss: {train_metrics['loss']:.4f}, "
+                f"RMSE: {train_metrics['rmse']:.4f}, "
+                f"MAE: {train_metrics['mae']:.4f}, "
+                f"R²: {train_metrics['r2']:.4f}"
             )
 
             # 验证
             val_metrics = self.validate()
             self.logger.info(
-                f"Epoch {epoch + 1}/{epochs} - Val - Loss: {val_metrics['loss']:.4f}, "
-                f"Accuracy: {val_metrics['accuracy']:.2%}"
+                f"Epoch {epoch + 1}/{epochs} - Val - "
+                f"Loss: {val_metrics['loss']:.4f}, "
+                f"RMSE: {val_metrics['rmse']:.4f}, "
+                f"MAE: {val_metrics['mae']:.4f}, "
+                f"R²: {val_metrics['r2']:.4f}"
             )
 
             # 更新指标追踪器
@@ -302,15 +371,21 @@ class Trainer:
             # 学习率调度
             if self.scheduler:
                 if isinstance(self.scheduler, optim.lr_scheduler.ReduceLROnPlateau):
-                    self.scheduler.step(val_metrics['accuracy'])
+                    self.scheduler.step(val_metrics[metric_name])
                 else:
                     self.scheduler.step()
 
             # 保存模型
             self._save_model(val_metrics)
 
+            # 早停检查
+            val_loss = val_metrics.get(metric_name, val_metrics['loss'])
+            if self._check_early_stopping(val_loss, mode):
+                self.logger.info(f"早停触发，训练结束")
+                break
+
             # 保存检查点
-            checkpoint_interval = self.output_config.get('save_interval', 1)
+            checkpoint_interval = self.output_config.get('save_interval', 5)
             if (epoch + 1) % checkpoint_interval == 0:
                 self.checkpoint_manager.save(
                     self.model,
@@ -321,12 +396,44 @@ class Trainer:
                 )
 
         self.logger.info("训练完成!")
-        self.logger.info(f"最佳验证准确率: {self.best_metric:.2%}")
+        self.logger.info(f"最佳验证{metric_name}: {self.best_metric:.4f}")
 
         # 保存训练曲线
         self.metrics_tracker.save_plots(
-            self.output_config.get('vis_dir', './outputs/visualizations')
+            self.output_config.get('vis_dir', './outputs_house_price/visualizations')
         )
+
+    def _check_early_stopping(self, val_metric: float, mode: str) -> bool:
+        """
+        检查是否触发早停
+
+        Args:
+            val_metric: 验证指标
+            mode: 优化模式 (min 或 max)
+
+        Returns:
+            是否触发早停
+        """
+        if self.early_stopping_patience <= 0:
+            return False
+
+        if mode == 'min':
+            if val_metric < self.best_metric - self.early_stopping_min_delta:
+                self.best_metric = val_metric
+                self.early_stopping_counter = 0
+            else:
+                self.early_stopping_counter += 1
+        else:
+            if val_metric > self.best_metric + self.early_stopping_min_delta:
+                self.best_metric = val_metric
+                self.early_stopping_counter = 0
+            else:
+                self.early_stopping_counter += 1
+
+        if self.early_stopping_counter >= self.early_stopping_patience:
+            return True
+
+        return False
 
     def _save_model(self, val_metrics: Dict[str, float]) -> None:
         """
@@ -336,10 +443,19 @@ class Trainer:
             val_metrics: 验证指标
         """
         validation_config = self.config.get('validation', {})
-        metric_name = validation_config.get('metric', 'accuracy')
-        metric_value = val_metrics.get(metric_name, 0)
+        metric_name = validation_config.get('metric', 'rmse')
+        mode = validation_config.get('mode', 'min')
 
-        if metric_value > self.best_metric:
+        metric_value = val_metrics.get(metric_name, val_metrics.get('loss', float('inf')))
+
+        # 判断是否是最佳模型
+        is_best = False
+        if mode == 'min':
+            is_best = metric_value < self.best_metric
+        else:
+            is_best = metric_value > self.best_metric
+
+        if is_best:
             self.best_metric = metric_value
             self.checkpoint_manager.save(
                 self.model,
@@ -348,4 +464,4 @@ class Trainer:
                 self.metrics_tracker,
                 is_best=True
             )
-            self.logger.info(f"保存最佳模型, {metric_name}: {metric_value:.2%}")
+            self.logger.info(f"保存最佳模型, {metric_name}: {metric_value:.4f}")

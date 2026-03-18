@@ -54,7 +54,6 @@ class CheckpointManager:
         # 保存定期检查点
         checkpoint_path = os.path.join(self.save_dir, f'checkpoint_epoch_{epoch}.pth')
         torch.save(checkpoint, checkpoint_path)
-        self.logger.info(f"检查点已保存: {checkpoint_path}")
 
         # 保存最佳模型
         if is_best:
@@ -91,7 +90,7 @@ class CheckpointManager:
         if device is None:
             device = torch.device('cpu')
 
-        checkpoint = torch.load(checkpoint_path, map_location=device)
+        checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
 
         # 加载模型权重
         model.load_state_dict(checkpoint['model_state_dict'])

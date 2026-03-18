@@ -1,0 +1,48 @@
+2026-03-18 21:34:40 - DeepLearningPipeline - INFO - 日志文件: ./outputs_house_price/logs/train_20260318_213440.log
+2026-03-18 21:34:40 - DeepLearningPipeline - INFO - ============================================================
+2026-03-18 21:34:40 - DeepLearningPipeline - INFO - 实验名称: california_house_price_prediction
+2026-03-18 21:34:40 - DeepLearningPipeline - INFO - 实验描述: California房价预测 - Kaggle比赛数据
+2026-03-18 21:34:40 - DeepLearningPipeline - INFO - 随机种子: 42
+2026-03-18 21:34:40 - DeepLearningPipeline - INFO - ============================================================
+2026-03-18 21:34:40 - DeepLearningPipeline - INFO - 创建数据加载器...
+2026-03-18 21:34:41 - DeepLearningPipeline - INFO - 特征维度: 22
+2026-03-18 21:34:41 - DeepLearningPipeline - INFO - 创建模型...
+2026-03-18 21:34:41 - DeepLearningPipeline - INFO - 初始化训练器...
+2026-03-18 21:34:42 - DeepLearningPipeline - INFO - 训练器初始化完成, 使用设备: mps
+2026-03-18 21:34:42 - DeepLearningPipeline - INFO - 开始训练...
+2026-03-18 21:34:42 - DeepLearningPipeline - INFO - 开始训练, 共 100 个 epoch
+2026-03-18 21:34:48 - DeepLearningPipeline - INFO - Epoch 1/100 - Train - Loss: 111.3387, RMSE: 10.5574, MAE: 10.2265, R²: -174.5074
+2026-03-18 21:34:52 - DeepLearningPipeline - INFO - Epoch 1/100 - Val - Loss: 35.4189, RMSE: 5.9545, MAE: 5.8616, R²: -54.9405
+2026-03-18 21:34:52 - DeepLearningPipeline - INFO - 最佳模型已保存: ./outputs_house_price/checkpoints/best_model.pth
+2026-03-18 21:34:52 - DeepLearningPipeline - INFO - 保存最佳模型, rmse: 5.9545
+2026-03-18 21:34:58 - DeepLearningPipeline - INFO - Epoch 2/100 - Train - Loss: 11.3815, RMSE: 3.3751, MAE: 2.7072, R²: -16.9374
+2026-03-18 21:35:02 - DeepLearningPipeline - INFO - Epoch 2/100 - Val - Loss: 0.8508, RMSE: 0.9253, MAE: 0.7439, R²: -0.3507
+2026-03-18 21:35:02 - DeepLearningPipeline - INFO - 最佳模型已保存: ./outputs_house_price/checkpoints/best_model.pth
+2026-03-18 21:35:02 - DeepLearningPipeline - INFO - 保存最佳模型, rmse: 0.9253
+2026-03-18 21:35:08 - DeepLearningPipeline - INFO - Epoch 3/100 - Train - Loss: 5.3248, RMSE: 2.3079, MAE: 1.8345, R²: -7.3872
+2026-03-18 21:35:12 - DeepLearningPipeline - INFO - Epoch 3/100 - Val - Loss: 0.6389, RMSE: 0.7992, MAE: 0.6015, R²: -0.0077
+2026-03-18 21:35:12 - DeepLearningPipeline - INFO - 最佳模型已保存: ./outputs_house_price/checkpoints/best_model.pth
+2026-03-18 21:35:12 - DeepLearningPipeline - INFO - 保存最佳模型, rmse: 0.7992
+2026-03-18 21:35:19 - DeepLearningPipeline - INFO - Epoch 4/100 - Train - Loss: 4.2292, RMSE: 2.0566, MAE: 1.6292, R²: -5.6600
+2026-03-18 21:35:22 - DeepLearningPipeline - INFO - Epoch 4/100 - Val - Loss: 0.4728, RMSE: 0.6865, MAE: 0.5313, R²: 0.2565
+2026-03-18 21:35:22 - DeepLearningPipeline - INFO - 最佳模型已保存: ./outputs_house_price/checkpoints/best_model.pth
+2026-03-18 21:35:22 - DeepLearningPipeline - INFO - 保存最佳模型, rmse: 0.6865
+2026-03-18 21:35:29 - DeepLearningPipeline - INFO - Epoch 5/100 - Train - Loss: 3.7725, RMSE: 1.9425, MAE: 1.5306, R²: -4.9416
+2026-03-18 21:35:33 - DeepLearningPipeline - INFO - Epoch 5/100 - Val - Loss: 0.5271, RMSE: 0.7247, MAE: 0.5963, R²: 0.1715
+2026-03-18 21:35:39 - DeepLearningPipeline - INFO - Epoch 6/100 - Train - Loss: 3.5583, RMSE: 1.8866, MAE: 1.4892, R²: -4.6043
+2026-03-18 21:35:43 - DeepLearningPipeline - INFO - Epoch 6/100 - Val - Loss: 0.3109, RMSE: 0.5588, MAE: 0.4084, R²: 0.5073
+2026-03-18 21:35:43 - DeepLearningPipeline - INFO - 最佳模型已保存: ./outputs_house_price/checkpoints/best_model.pth
+2026-03-18 21:35:43 - DeepLearningPipeline - INFO - 保存最佳模型, rmse: 0.5588
+2026-03-18 21:35:49 - DeepLearningPipeline - INFO - Epoch 7/100 - Train - Loss: 3.4855, RMSE: 1.8669, MAE: 1.4737, R²: -4.4884
+2026-03-18 21:35:53 - DeepLearningPipeline - INFO - Epoch 7/100 - Val - Loss: 0.3909, RMSE: 0.6260, MAE: 0.5078, R²: 0.3817
+2026-03-18 21:35:59 - DeepLearningPipeline - INFO - Epoch 8/100 - Train - Loss: 3.2877, RMSE: 1.8129, MAE: 1.4316, R²: -4.1755
+2026-03-18 21:36:03 - DeepLearningPipeline - INFO - Epoch 8/100 - Val - Loss: 0.7532, RMSE: 0.8682, MAE: 0.7567, R²: -0.1892
+2026-03-18 21:36:09 - DeepLearningPipeline - INFO - Epoch 9/100 - Train - Loss: 3.2876, RMSE: 1.8131, MAE: 1.4325, R²: -4.1764
+2026-03-18 21:36:13 - DeepLearningPipeline - INFO - Epoch 9/100 - Val - Loss: 0.2989, RMSE: 0.5473, MAE: 0.4261, R²: 0.5275
+2026-03-18 21:36:13 - DeepLearningPipeline - INFO - 最佳模型已保存: ./outputs_house_price/checkpoints/best_model.pth
+2026-03-18 21:36:13 - DeepLearningPipeline - INFO - 保存最佳模型, rmse: 0.5473
+2026-03-18 21:36:19 - DeepLearningPipeline - INFO - Epoch 10/100 - Train - Loss: 3.2018, RMSE: 1.7893, MAE: 1.4144, R²: -4.0413
+2026-03-18 21:36:22 - DeepLearningPipeline - INFO - Epoch 10/100 - Val - Loss: 0.3833, RMSE: 0.6181, MAE: 0.4719, R²: 0.3973
+2026-03-18 21:36:22 - DeepLearningPipeline - INFO - 早停触发，训练结束
+2026-03-18 21:36:22 - DeepLearningPipeline - INFO - 训练完成!
+2026-03-18 21:36:22 - DeepLearningPipeline - INFO - 最佳验证rmse: 0.5473

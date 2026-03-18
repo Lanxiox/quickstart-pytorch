@@ -1,6 +1,6 @@
 """
 评估模块
-负责模型的评估和指标计算
+负责模型的评估和指标计算 - 适配回归任务
 """
 
 import torch
@@ -12,25 +12,28 @@ from tqdm import tqdm
 
 
 class Evaluator:
-    """评估器类"""
+    """评估器类 - 适配回归任务"""
 
     def __init__(
         self,
         model: nn.Module,
-        test_loader: DataLoader,
-        device: torch.device
+        val_loader: DataLoader,
+        device: torch.device,
+        feature_processor=None
     ):
         """
         初始化评估器
 
         Args:
             model: 模型实例
-            test_loader: 测试数据加载器
+            val_loader: 验证数据加载器
             device: 计算设备
+            feature_processor: 特征处理器（用于目标变量逆变换）
         """
         self.model = model
-        self.test_loader = test_loader
+        self.val_loader = val_loader
         self.device = device
+        self.feature_processor = feature_processor
         self.model = self.model.to(self.device)
 
     def evaluate(self) -> Dict[str, float]:
@@ -43,51 +46,57 @@ class Evaluator:
         self.model.eval()
 
         total_loss = 0.0
-        correct = 0
-        total = 0
+        all_predictions = []
+        all_targets = []
 
-        # 每个类别的统计
-        class_correct = {}
-        class_total = {}
-
-        criterion = nn.CrossEntropyLoss()
+        criterion = nn.MSELoss()
 
         with torch.no_grad():
-            for inputs, targets in tqdm(self.test_loader, desc="Evaluating"):
+            for inputs, targets in tqdm(self.val_loader, desc="Evaluating"):
                 inputs, targets = inputs.to(self.device), targets.to(self.device)
 
                 outputs = self.model(inputs)
                 loss = criterion(outputs, targets)
 
                 total_loss += loss.item()
-                _, predicted = outputs.max(1)
-                total += targets.size(0)
-                correct += predicted.eq(targets).sum().item()
+                all_predictions.append(outputs.cpu())
+                all_targets.append(targets.cpu())
 
-                # 每个类别的统计
-                for i in range(targets.size(0)):
-                    label = targets[i].item()
-                    if label not in class_total:
-                        class_total[label] = 0
-                        class_correct[label] = 0
-                    class_total[label] += 1
-                    if predicted[i].item() == label:
-                        class_correct[label] += 1
+        # 合并所有预测和目标
+        all_predictions = torch.cat(all_predictions, dim=0).numpy().flatten()
+        all_targets = torch.cat(all_targets, dim=0).numpy().flatten()
 
-        # 计算总体指标
-        avg_loss = total_loss / len(self.test_loader)
-        accuracy = correct / total
+        # 如果有特征处理器，逆变换目标变量
+        if self.feature_processor is not None:
+            # 注意：这里评估的是变换后的值
+            pass
 
-        # 计算每个类别的准确率
-        class_accuracies = {}
-        for label in sorted(class_total.keys()):
-            if class_total[label] > 0:
-                class_accuracies[label] = class_correct[label] / class_total[label]
+        # 计算各项指标
+        mse = np.mean((all_predictions - all_targets) ** 2)
+        rmse = np.sqrt(mse)
+        mae = np.mean(np.abs(all_predictions - all_targets))
+
+        # R² Score
+        ss_res = np.sum((all_targets - all_predictions) ** 2)
+        ss_tot = np.sum((all_targets - np.mean(all_targets)) ** 2)
+        r2 = 1 - (ss_res / ss_tot) if ss_tot > 0 else 0
+
+        # MAPE (避免除零)
+        mask = all_targets != 0
+        if np.any(mask):
+            mape = np.mean(np.abs((all_targets[mask] - all_predictions[mask]) / all_targets[mask])) * 100
+        else:
+            mape = 0.0
+
+        avg_loss = total_loss / len(self.val_loader)
 
         metrics = {
             'loss': avg_loss,
-            'accuracy': accuracy,
-            'class_accuracies': class_accuracies
+            'mse': mse,
+            'rmse': rmse,
+            'mae': mae,
+            'r2': r2,
+            'mape': mape
         }
 
         return metrics
@@ -107,9 +116,8 @@ class Evaluator:
         with torch.no_grad():
             inputs = inputs.to(self.device)
             outputs = self.model(inputs)
-            _, predicted = outputs.max(1)
 
-        return predicted.cpu().numpy()
+        return outputs.cpu().numpy().flatten()
 
     def print_evaluation_results(self, metrics: Dict[str, float]) -> None:
         """
@@ -121,12 +129,9 @@ class Evaluator:
         print("\n" + "="*50)
         print("评估结果")
         print("="*50)
-        print(f"总准确率: {metrics['accuracy']:.2%}")
-        print(f"平均损失: {metrics['loss']:.4f}")
-        print("\n各类别准确率:")
-        print("-"*50)
-
-        for label, acc in sorted(metrics['class_accuracies'].items()):
-            print(f"类别 {label}: {acc:.2%}")
-
+        print(f"均方损失 (MSE): {metrics['mse']:.4f}")
+        print(f"均方根损失 (RMSE): {metrics['rmse']:.4f}")
+        print(f"平均绝对损失 (MAE): {metrics['mae']:.4f}")
+        print(f"R² 决定系数: {metrics['r2']:.4f}")
+        print(f"平均绝对百分比误差 (MAPE): {metrics['mape']:.2f}%")
         print("="*50 + "\n")

@@ -1,0 +1,148 @@
+# California 房价预测配置文件
+# 基于 Kaggle: California House Prices 比赛数据
+
+# 数据配置
+data:
+  data_root: "../作业2 李沐房价预测/california-house-prices"  # 数据根目录
+  train_file: "train.csv"
+  test_file: "test.csv"
+  target_column: "Sold Price"  # 目标变量
+  id_column: "Id"  # ID列
+
+  # 数值特征列
+  numeric_features:
+    - "Year built"
+    - "Lot"
+    - "Bedrooms"
+    - "Bathrooms"
+    - "Full bathrooms"
+    - "Total interior livable area"
+    - "Total spaces"
+    - "Garage spaces"
+    - "Elementary School Score"
+    - "Elementary School Distance"
+    - "Middle School Score"
+    - "Middle School Distance"
+    - "High School Score"
+    - "High School Distance"
+    - "Tax assessed value"
+    - "Annual tax amount"
+    - "Listed Price"
+    - "Last Sold Price"
+
+  # 类别特征列
+  categorical_features:
+    - "Type"
+    - "Region"
+    - "City"
+    - "State"
+
+  # 丢弃的列（复杂文本或无法处理的列）
+  drop_columns:
+    - "Address"
+    - "Summary"
+    - "Heating"
+    - "Cooling"
+    - "Parking"
+    - "Flooring"
+    - "Heating features"
+    - "Cooling features"
+    - "Appliances included"
+    - "Laundry features"
+    - "Parking features"
+    - "Elementary School"
+    - "Middle School"
+    - "High School"
+    - "Listed On"
+    - "Last Sold On"
+
+  batch_size: 128  # 批次大小
+  num_workers: 4   # 数据加载进程数
+  pin_memory: true
+  test_size: 0.2   # 验证集比例
+  random_state: 42
+
+# 特征工程配置
+feature_engineering:
+  # 缺失值处理策略
+  handle_missing:
+    numeric: "median"    # 数值型用中位数填充
+    categorical: "mode"  # 类别型用众数填充
+
+  # 数值特征标准化
+  normalize: true
+  normalization_method: "standard"  # standard(标准正态) 或 minmax
+
+  # 类别特征编码
+  categorical_encoding: "label"  # label(标签编码) 或 onehot
+
+  # 目标变量处理
+  target_transform: "log1p"  # log1p(对数变换) 或 none
+
+# 模型配置
+model:
+  name: "HousePriceMLP"
+  params:
+    input_dim: null  # 根据特征数自动确定
+    hidden_sizes: [256, 128, 64, 32]
+    dropout: 0.3
+
+# 训练配置
+training:
+  epochs: 100
+  learning_rate: 0.0001
+  weight_decay: 0.0001
+  momentum: 0.9
+  optimizer: "Adam"
+  loss_function: "MSELoss"  # 回归任务使用MSE
+  scheduler:
+    name: "ReduceLROnPlateau"
+    params:
+      mode: "min"
+      factor: 0.5
+      patience: 5
+      verbose: true
+  gradient_clip: 1.0  # 梯度裁剪
+  early_stopping:
+    patience: 20
+    min_delta: 0.001
+
+# 验证配置
+validation:
+  interval: 1
+  save_best: true
+  metric: "rmse"  # 验证指标
+  mode: "min"     # 最小化指标
+
+# 输出配置
+output:
+  save_dir: "./outputs_house_price"
+  checkpoint_dir: "./outputs_house_price/checkpoints"
+  log_dir: "./outputs_house_price/logs"
+  vis_dir: "./outputs_house_price/visualizations"
+  save_interval: 5
+  save_optimizer: true
+  tensorboard: false
+
+# 设备配置
+device:
+  device: "auto"
+  mixed_precision: false
+
+# 日志配置
+logging:
+  level: "INFO"
+  save_to_file: true
+  console_output: true
+
+# 随机种子
+random_seed:
+  seed: 42
+  deterministic: true
+  benchmark: false
+
+# 实验信息
+experiment:
+  name: "california_house_price_prediction"
+  description: "California房价预测 - Kaggle比赛数据"
+  tags: ["regression", "house-price", "california"]

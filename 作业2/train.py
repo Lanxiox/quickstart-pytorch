@@ -1,5 +1,5 @@
 """
-主训练脚本
+房价预测训练脚本
 使用配置文件进行模型训练
 """
 
@@ -46,12 +46,12 @@ def set_seed(seed: int, deterministic: bool = True, benchmark: bool = False) -> 
 
 def parse_args():
     """解析命令行参数"""
-    parser = argparse.ArgumentParser(description='深度学习训练脚本')
+    parser = argparse.ArgumentParser(description='房价预测训练脚本')
 
     parser.add_argument(
         '--config',
         type=str,
-        default='./configs/default_config.yaml',
+        default='./configs/house_price_config.yaml',
         help='配置文件路径'
     )
 
@@ -96,7 +96,7 @@ def main():
     output_config = config_dict.get('output', {})
 
     logger = Logger(
-        log_dir=output_config.get('log_dir', './outputs/logs'),
+        log_dir=output_config.get('log_dir', './outputs_house_price/logs'),
         level=log_config.get('level', 'INFO'),
         save_to_file=log_config.get('save_to_file', True),
         console_output=log_config.get('console_output', True)
@@ -113,22 +113,34 @@ def main():
     # 创建数据加载器
     logger.info("创建数据加载器...")
     data_processor = create_data_processor(config_dict)
-    dataloaders = data_processor.create_dataloaders()
+    train_loader, val_loader = data_processor.load_and_process_data()
+
+    # 获取特征维度
+    input_dim = data_processor.get_feature_dim()
+    config_dict['model']['params']['input_dim'] = input_dim
+    logger.info(f"特征维度: {input_dim}")
+
+    # 保存特征处理器
+    feature_processor_path = os.path.join(
+        output_config.get('checkpoint_dir', './outputs_house_price/checkpoints'),
+        'feature_processor.pkl'
+    )
+    data_processor.save_feature_processor(feature_processor_path)
 
     # 创建模型
     logger.info("创建模型...")
     model_config = config_dict.get('model', {})
     model = create_model(model_config)
-    logger.info(f"模型: {model_config.get('name', 'Unknown')}")
 
     # 创建训练器
     logger.info("初始化训练器...")
     trainer = Trainer(
         model=model,
-        train_loader=dataloaders['train'],
-        val_loader=dataloaders['test'],
+        train_loader=train_loader,
+        val_loader=val_loader,
         config=config_dict,
-        logger=logger
+        logger=logger,
+        feature_processor=data_processor.feature_processor
     )
 
     # 开始训练

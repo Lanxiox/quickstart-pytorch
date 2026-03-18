@@ -1,5 +1,5 @@
 """
-评估脚本
+房价预测评估脚本
 评估训练好的模型
 """
 
@@ -22,12 +22,12 @@ from utils import Logger
 
 def parse_args():
     """解析命令行参数"""
-    parser = argparse.ArgumentParser(description='模型评估脚本')
+    parser = argparse.ArgumentParser(description='房价预测评估脚本')
 
     parser.add_argument(
         '--config',
         type=str,
-        default='./configs/default_config.yaml',
+        default='./configs/house_price_config.yaml',
         help='配置文件路径'
     )
 
@@ -71,7 +71,19 @@ def main():
     # 创建数据加载器
     logger.info("创建数据加载器...")
     data_processor = create_data_processor(config_dict)
-    dataloaders = data_processor.create_dataloaders()
+    train_loader, val_loader = data_processor.load_and_process_data()
+
+    # 获取特征维度
+    input_dim = data_processor.get_feature_dim()
+    config_dict['model']['params']['input_dim'] = input_dim
+
+    # 加载特征处理器
+    output_config = config_dict.get('output', {})
+    feature_processor_path = os.path.join(
+        output_config.get('checkpoint_dir', './outputs_house_price/checkpoints'),
+        'feature_processor.pkl'
+    )
+    data_processor.load_feature_processor(feature_processor_path)
 
     # 创建模型
     logger.info("创建模型...")
@@ -82,9 +94,8 @@ def main():
     # 加载模型权重
     checkpoint_path = args.checkpoint
     if checkpoint_path is None:
-        output_config = config_dict.get('output', {})
         checkpoint_path = os.path.join(
-            output_config.get('checkpoint_dir', './outputs/checkpoints'),
+            output_config.get('checkpoint_dir', './outputs_house_price/checkpoints'),
             'best_model.pth'
         )
 
@@ -93,12 +104,17 @@ def main():
         return
 
     logger.info(f"加载模型: {checkpoint_path}")
-    checkpoint = torch.load(checkpoint_path, map_location=device)
+    checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
     model.load_state_dict(checkpoint['model_state_dict'])
 
     # 创建评估器
     logger.info("开始评估...")
-    evaluator = Evaluator(model, dataloaders['test'], device)
+    evaluator = Evaluator(
+        model,
+        val_loader,
+        device,
+        feature_processor=data_processor.feature_processor
+    )
 
     # 评估模型
     metrics = evaluator.evaluate()

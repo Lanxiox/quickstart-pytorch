@@ -1,15 +1,13 @@
 """
-推理脚本
-对单个图像或批量图像进行推理
+房价预测推理脚本
+对测试数据进行预测
 """
 
 import os
 import sys
 import argparse
 import torch
-from torchvision import transforms
-from PIL import Image
-import matplotlib.pyplot as plt
+import pandas as pd
 
 # 添加项目根目录到Python路径
 project_root = os.path.dirname(os.path.abspath(__file__))
@@ -18,17 +16,17 @@ if project_root not in sys.path:
 
 from configs.config import Config
 from models import create_model
-from inference import Inferencer
+from inference import HousePriceInferencer, load_test_data
 
 
 def parse_args():
     """解析命令行参数"""
-    parser = argparse.ArgumentParser(description='模型推理脚本')
+    parser = argparse.ArgumentParser(description='房价预测推理脚本')
 
     parser.add_argument(
         '--config',
         type=str,
-        default='./configs/default_config.yaml',
+        default='./configs/house_price_config.yaml',
         help='配置文件路径'
     )
 
@@ -40,52 +38,13 @@ def parse_args():
     )
 
     parser.add_argument(
-        '--image',
-        type=str,
-        required=True,
-        help='推理图像路径'
-    )
-
-    parser.add_argument(
-        '--visualize',
-        action='store_true',
-        help='是否可视化结果'
-    )
-
-    parser.add_argument(
         '--output',
         type=str,
-        default=None,
-        help='可视化输出路径'
+        default='./outputs_house_price/predictions.csv',
+        help='预测结果输出路径'
     )
 
     return parser.parse_args()
-
-
-def get_transform(config_dict: dict, split: str = 'test') -> transforms.Compose:
-    """
-    获取数据变换
-
-    Args:
-        config_dict: 配置字典
-        split: 数据集划分
-
-    Returns:
-        变换组合
-    """
-    transform_list = []
-    transforms_config = config_dict.get('transforms', {})
-    transform_configs = transforms_config.get(split, [])
-
-    for transform_config in transform_configs:
-        name = transform_config.get('name')
-        params = transform_config.get('params', {})
-
-        if hasattr(transforms, name):
-            transform_func = getattr(transforms, name)
-            transform_list.append(transform_func(**params))
-
-    return transforms.Compose(transform_list)
 
 
 def main():
@@ -108,17 +67,12 @@ def main():
 
     print(f"使用设备: {device}")
 
-    # 创建模型
-    print("创建模型...")
-    model_config = config_dict.get('model', {})
-    model = create_model(model_config)
-
     # 获取检查点路径
     checkpoint_path = args.checkpoint
     if checkpoint_path is None:
         output_config = config_dict.get('output', {})
         checkpoint_path = os.path.join(
-            output_config.get('checkpoint_dir', './outputs/checkpoints'),
+            output_config.get('checkpoint_dir', './outputs_house_price/checkpoints'),
             'best_model.pth'
         )
 
@@ -126,68 +80,71 @@ def main():
         print(f"错误: 模型文件不存在: {checkpoint_path}")
         return
 
-    # 获取数据变换
-    transform = get_transform(config_dict, 'test')
+    # 先加载特征处理器获取input_dim
+    from utils.feature_processor import FeatureProcessor
+    output_config = config_dict.get('output', {})
+    feature_processor_path = os.path.join(
+        output_config.get('checkpoint_dir', './outputs_house_price/checkpoints'),
+        'feature_processor.pkl'
+    )
+
+    feature_processor = FeatureProcessor(config_dict)
+    feature_processor.load(feature_processor_path)
+
+    # 获取特征维度
+    input_dim = feature_processor.get_feature_dim()
+    config_dict['model']['params']['input_dim'] = input_dim
+    print(f"特征维度: {input_dim}")
+
+    # 创建模型
+    print("创建模型...")
+    model_config = config_dict.get('model', {})
+    model = create_model(model_config)
 
     # 创建推理器
     print(f"加载模型: {checkpoint_path}")
-    inferencer = Inferencer(model, checkpoint_path, transform, device)
+    inferencer = HousePriceInferencer(model, checkpoint_path, feature_processor, device)
 
-    # 推理
-    print(f"\n推理图像: {args.image}")
-    result = inferencer.predict(args.image)
+    # 加载测试数据
+    print("加载测试数据...")
+    test_df = load_test_data(config_dict)
 
-    # 打印结果
-    print("\n" + "="*50)
-    print("推理结果")
-    print("="*50)
-    print(f"预测类别: {result['predicted_class']}")
-    print(f"置信度: {result['confidence']:.2%}")
-    print("\n各类别概率:")
-    print("-"*50)
+    # 获取ID列
+    data_config = config_dict.get('data', {})
+    id_column = data_config.get('id_column', 'Id')
 
-    for i, prob in enumerate(result['probabilities']):
-        print(f"类别 {i}: {prob:.2%}")
+    # 获取特征列
+    numeric_features = data_config.get('numeric_features', [])
+    categorical_features = data_config.get('categorical_features', [])
+    feature_columns = numeric_features + categorical_features
 
-    print("="*50 + "\n")
+    # 确保特征列存在
+    test_features = test_df[[c for c in feature_columns if c in test_df.columns]]
 
-    # 可视化
-    if args.visualize:
-        fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+    # 预测
+    print("开始预测...")
+    predictions = inferencer.predict_batch(test_features)
 
-        # 显示原图
-        image = Image.open(args.image)
-        axes[0].imshow(image, cmap='gray')
-        axes[0].set_title('原图')
-        axes[0].axis('off')
+    # 保存结果
+    results = []
+    for i, pred in enumerate(predictions):
+        results.append({
+            id_column: test_df.iloc[i][id_column] if id_column in test_df.columns else i,
+            'Predicted': pred['predicted_price']
+        })
 
-        # 显示预测结果
-        classes = list(range(10))
-        probabilities = result['probabilities']
-        colors = ['green' if i == result['predicted_class'] else 'blue'
-                  for i in range(len(classes))]
+    results_df = pd.DataFrame(results)
+    os.makedirs(os.path.dirname(args.output) if os.path.dirname(args.output) else '.', exist_ok=True)
+    results_df.to_csv(args.output, index=False)
 
-        bars = axes[1].bar(classes, probabilities, color=colors)
-        axes[1].set_xlabel('类别')
-        axes[1].set_ylabel('概率')
-        axes[1].set_title(f'预测结果: {result["predicted_class"]} (置信度: {result["confidence"]:.2%})')
-        axes[1].set_ylim(0, 1)
-        axes[1].grid(True, alpha=0.3)
-
-        # 添加概率标签
-        for bar, prob in zip(bars, probabilities):
-            height = bar.get_height()
-            axes[1].text(bar.get_x() + bar.get_width()/2., height,
-                        f'{prob:.2%}',
-                        ha='center', va='bottom', fontsize=8)
-
-        plt.tight_layout()
-
-        if args.output:
-            plt.savefig(args.output, dpi=300, bbox_inches='tight')
-            print(f"可视化结果已保存: {args.output}")
-        else:
-            plt.show()
+    print(f"\n预测完成!")
+    print(f"预测结果已保存到: {args.output}")
+    print(f"预测样本数: {len(results_df)}")
+    print(f"\n预测价格统计:")
+    print(f"  最低: ${results_df['Predicted'].min():,.2f}")
+    print(f"  最高: ${results_df['Predicted'].max():,.2f}")
+    print(f"  平均: ${results_df['Predicted'].mean():,.2f}")
+    print(f"  中位数: ${results_df['Predicted'].median():,.2f}")
 
 
 if __name__ == '__main__':

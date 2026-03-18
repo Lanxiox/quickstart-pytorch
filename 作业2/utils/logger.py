@@ -31,7 +31,7 @@ class Logger:
         """
         self.logger = logging.getLogger(name)
         self.logger.setLevel(getattr(logging, level.upper()))
-        self.logger.handlers.clear()  # 清除已有的handlers
+        self.logger.handlers.clear()
 
         # 日志格式
         formatter = logging.Formatter(

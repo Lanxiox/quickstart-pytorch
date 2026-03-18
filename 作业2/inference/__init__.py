@@ -2,6 +2,6 @@
 推理模块
 """
 
-from .inferencer import Inferencer
+from .inferencer import HousePriceInferencer, load_test_data
 
-__all__ = ['Inferencer']
+__all__ = ['HousePriceInferencer', 'load_test_data']

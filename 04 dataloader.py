@@ -22,3 +22,9 @@ collate_fn 拼 batch
 (4)总的来说, Dataset 负责保存数据并实现 __getitem__(index)，定义 index → sample 的映射规则；
 DataLoader 负责通过 Sampler 生成索引，然后调用 dataset[index] 取出每个 sample 并把多个 sample 组成 batch 返回。
 """
+
+"""
+进程和线程
+进程：资源分配 为了隔离的执行环境 资源:内存、文件描述符表、环境变量、信号处理表 
+线程: cpu调度的基本单位的 资源:寄存器、栈、程序计数器 统一进程的线程共享进程的资源
+"""

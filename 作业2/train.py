@@ -22,6 +22,13 @@ from trainers import Trainer
 from utils import Logger
 
 
+def resolve_path(path: str) -> str:
+    """解析相对路径为绝对路径（相对于脚本所在目录）"""
+    if os.path.isabs(path):
+        return path
+    return os.path.join(project_root, path)
+
+
 def set_seed(seed: int, deterministic: bool = True, benchmark: bool = False) -> None:
     """
     设置随机种子
@@ -51,7 +58,7 @@ def parse_args():
     parser.add_argument(
         '--config',
         type=str,
-        default='./configs/house_price_config.yaml',
+        default=os.path.join(project_root, 'configs/house_price_config.yaml'),
         help='配置文件路径'
     )
 
@@ -96,7 +103,7 @@ def main():
     output_config = config_dict.get('output', {})
 
     logger = Logger(
-        log_dir=output_config.get('log_dir', './outputs_house_price/logs'),
+        log_dir=resolve_path(output_config.get('log_dir', './outputs_house_price/logs')),
         level=log_config.get('level', 'INFO'),
         save_to_file=log_config.get('save_to_file', True),
         console_output=log_config.get('console_output', True)
@@ -122,7 +129,7 @@ def main():
 
     # 保存特征处理器
     feature_processor_path = os.path.join(
-        output_config.get('checkpoint_dir', './outputs_house_price/checkpoints'),
+        resolve_path(output_config.get('checkpoint_dir', './outputs_house_price/checkpoints')),
         'feature_processor.pkl'
     )
     data_processor.save_feature_processor(feature_processor_path)

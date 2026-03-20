@@ -168,6 +168,10 @@ def load_test_data(config: Dict[str, Any]) -> pd.DataFrame:
     """
     data_config = config.get('data', {})
     data_root = data_config.get('data_root', './data')
+    # 如果是相对路径，转换为相对于脚本所在目录的绝对路径
+    if not os.path.isabs(data_root):
+        script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        data_root = os.path.join(script_dir, data_root)
     test_file = data_config.get('test_file', 'test.csv')
     test_path = os.path.join(data_root, test_file)
 

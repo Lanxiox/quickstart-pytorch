@@ -261,6 +261,10 @@ def load_data(config: Dict[str, Any]) -> Tuple[pd.DataFrame, pd.DataFrame, pd.Se
 
     # 读取训练数据
     data_root = data_config.get('data_root', './data')
+    # 如果是相对路径，转换为相对于脚本所在目录的绝对路径
+    if not os.path.isabs(data_root):
+        script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        data_root = os.path.join(script_dir, data_root)
     train_file = data_config.get('train_file', 'train.csv')
     train_path = os.path.join(data_root, train_file)
 
